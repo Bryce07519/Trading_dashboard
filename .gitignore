@@ -1,0 +1,21 @@
+# Python/临时
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.env
+
+# VSCode/IDE
+.vscode/
+.idea/
+
+# data: 只保留网页展示需要的文件；其它都忽略
+data/*
+!data/stats.json
+!data/equity_curve.png
+!data/pnl_hist.png
+
+# 可选：notebooks/缓存/大文件
+*.ipynb_checkpoints
+.DS_Store
