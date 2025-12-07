@@ -3,83 +3,366 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ULDL自动化交易策略表现</title>
+    <title>ULDL Crypto Strategy Dashboard</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f4f6f8; color: #333; margin: 0; padding: 20px; }
-        .container { max-width: 900px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-        h1 { text-align: center; color: #2c3e50; }
-        .image-container { text-align: center; } /* 让图片居中 */
-        img { max-width: 100%; height: auto; border-radius: 4px; margin-top: 20px; border: 1px solid #ddd; }
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-top: 30px; }
-        .stat-card { background-color: #f9fafb; padding: 15px; border-radius: 6px; border-left: 4px solid #3498db; }
-        .stat-card h3 { margin: 0 0 5px; font-size: 1em; color: #555; }
-        .stat-card p { margin: 0; font-size: 1.5em; font-weight: bold; color: #2c3e50; }
-        p.positive { color: #27ae60; }
-        p.negative { color: #c0392b; }
-        .footer { text-align: center; margin-top: 20px; font-size: 0.9em; color: #7f8c8d; }
+        :root {
+            --primary-color: #2563eb; /* 专业蓝 */
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #1e293b;
+            --text-sub: #64748b;
+            --success: #10b981;
+            --danger: #ef4444;
+            --border: #e2e8f0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* 布局结构 */
+        .sidebar {
+            width: 260px;
+            background: var(--card-bg);
+            border-right: 1px solid var(--border);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            height: 100%;
+            overflow-y: auto;
+        }
+
+        .main-content {
+            flex: 1;
+            margin-left: 260px; /* sidebar width */
+            padding: 30px;
+            max-width: 1200px;
+        }
+
+        /* 侧边栏样式 */
+        .brand {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--text-main);
+            margin-bottom: 30px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .nav-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            color: var(--text-sub);
+            margin-bottom: 10px;
+            letter-spacing: 0.05em;
+        }
+
+        .strategy-btn {
+            background: none;
+            border: 1px solid transparent;
+            width: 100%;
+            padding: 12px 15px;
+            text-align: left;
+            cursor: pointer;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            color: var(--text-sub);
+            font-weight: 500;
+            transition: all 0.2s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .strategy-btn:hover {
+            background-color: #f1f5f9;
+            color: var(--text-main);
+        }
+
+        .strategy-btn.active {
+            background-color: #eff6ff;
+            color: var(--primary-color);
+            border-color: #dbeafe;
+        }
+        
+        .freq-badge {
+            font-size: 0.7rem;
+            background: #e2e8f0;
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: var(--text-sub);
+        }
+
+        /* 主内容区域样式 */
+        .header {
+            margin-bottom: 30px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 20px;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 1.8rem;
+            color: var(--text-main);
+        }
+
+        .header .meta {
+            color: var(--text-sub);
+            font-size: 0.9rem;
+            margin-top: 5px;
+        }
+
+        /* 数据卡片网格 */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .metric-card {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            border: 1px solid var(--border);
+        }
+
+        .metric-title {
+            font-size: 0.85rem;
+            color: var(--text-sub);
+            margin-bottom: 8px;
+        }
+
+        .metric-value {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .val-pos { color: var(--success); }
+        .val-neg { color: var(--danger); }
+
+        /* 图表容器 */
+        .charts-container {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 30px;
+        }
+        
+        .chart-card {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        
+        .chart-card h3 {
+            margin-top: 0;
+            font-size: 1.1rem;
+            margin-bottom: 15px;
+            color: var(--text-main);
+        }
+
+        img {
+            width: 100%;
+            height: auto;
+            border-radius: 6px;
+        }
+
+        /* Footer */
+        .footer {
+            margin-top: 40px;
+            color: var(--text-sub);
+            font-size: 0.85rem;
+            text-align: center;
+        }
+
+        /* 响应式适配 */
+        @media (max-width: 768px) {
+            body { flex-direction: column; }
+            .sidebar {
+                width: 100%;
+                height: auto;
+                position: relative;
+                border-right: none;
+                border-bottom: 1px solid var(--border);
+                box-sizing: border-box;
+            }
+            .main-content { margin-left: 0; padding: 20px; }
+            .header h1 { font-size: 1.5rem; }
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>ULDL自动化交易策略表现</h1>
+
+    <!-- 侧边栏：策略选择 -->
+    <div class="sidebar">
+        <div class="brand">🚀 ULDL Strategies</div>
         
-        <div class="image-container">
-            <!-- 核心修正 1: 修改图片路径 -->
-            <img id="equity-curve-img" src="data/equity_curve.png" alt="资金曲线加载中...">
-            <!-- 我为你新增的 pnl_hist.png 也预留了位置，如果不想显示可以删除下面这行 -->
-            <img id="pnl-hist-img" src="data/pnl_hist.png" alt="PnL 分布图加载中...">
+        <div class="nav-label">Live Strategies</div>
+        <div id="strategy-list">
+            <!-- JavaScript 将在这里生成按钮 -->
+            <button class="strategy-btn">Loading...</button>
         </div>
-        
-        <div id="stats-container" class="stats-grid">
-            <!-- 统计数据将由JS动态加载到这里 -->
+    </div>
+
+    <!-- 主内容区 -->
+    <div class="main-content">
+        <!-- 头部信息 -->
+        <div class="header">
+            <h1 id="page-title">策略加载中...</h1>
+            <div class="meta">
+                <span id="strategy-tag">--</span> | 初始本金: <span id="strategy-capital">--</span> USDT
+            </div>
         </div>
-        
-        <p class="footer" id="last-update">最后更新时间加载中...</p>
+
+        <!-- 核心指标 -->
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-title">总收益率 (ROI)</div>
+                <div class="metric-value" id="val-roi">--%</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-title">总盈亏 (PnL)</div>
+                <div class="metric-value" id="val-pnl">--</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-title">最大回撤 (MDD)</div>
+                <div class="metric-value" id="val-mdd">--%</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-title">夏普比率 (Sharpe)</div>
+                <div class="metric-value" id="val-sharpe">--</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-title">实盘运行天数</div>
+                <div class="metric-value" id="val-days">--</div>
+            </div>
+        </div>
+
+        <!-- 图表展示 -->
+        <div class="charts-container">
+            <div class="chart-card">
+                <h3>资金曲线 (Equity Curve)</h3>
+                <img id="img-equity" src="" alt="Select a strategy to view data">
+            </div>
+            <div class="chart-card">
+                <h3>盈亏分布 (PnL Histogram)</h3>
+                <img id="img-pnl" src="" alt="Select a strategy to view data">
+            </div>
+        </div>
+
+        <div class="footer" id="last-update">
+            Last Updated: --
+        </div>
     </div>
 
     <script>
-        function loadData() {
-            // 更新图片，防止浏览器缓存
-            const timestamp = new Date().getTime();
-            document.getElementById('equity-curve-img').src = `data/equity_curve.png?t=${timestamp}`;
-            document.getElementById('pnl-hist-img').src = `data/pnl_hist.png?t=${timestamp}`;
+        let dashboardData = null;
+        let currentStrategyId = null;
 
-            // 核心修正 2: 修改 fetch 的 JSON 文件路径
-            fetch('data/stats.json')
-                .then(response => response.json())
-                .then(stats => {
-                    const container = document.getElementById('stats-container');
-                    container.innerHTML = ''; // 清空旧数据
+        // 格式化数字颜色
+        function formatNumberColor(elementId, value, isPercent = false) {
+            const el = document.getElementById(elementId);
+            const num = parseFloat(value);
+            let text = value;
+            if (isPercent) text += "%";
+            
+            el.textContent = text;
+            el.className = 'metric-value'; // 重置类名
+            
+            // MDD 特殊处理，总是负数，通常标红
+            if (elementId === 'val-mdd') {
+                el.classList.add('val-neg');
+                return;
+            }
 
-                    for (const [key, value] of Object.entries(stats)) {
-                        if (key.includes("最后更新时间")) continue;
-                        const card = document.createElement('div');
-                        card.className = 'stat-card';
-                        const title = document.createElement('h3');
-                        title.textContent = key;
-                        const p = document.createElement('p');
-                        p.textContent = value;
-                        
-                        const numericValue = parseFloat(value);
-                        if (!isNaN(numericValue)) {
-                            if (key.includes("回撤")) {
-                                p.className = 'negative';
-                            } else if (numericValue > 0) {
-                                p.className = 'positive';
-                            } else if (numericValue < 0) {
-                                p.className = 'negative';
-                            }
-                        }
-                        card.appendChild(title);
-                        card.appendChild(p);
-                        container.appendChild(card);
-                    }
-                    document.getElementById('last-update').textContent = `最后更新: ${stats['最后更新时间 (UTC)']}`;
-                })
-                .catch(error => console.error('加载统计数据失败:', error));
+            if (num > 0) el.classList.add('val-pos');
+            if (num < 0) el.classList.add('val-neg');
         }
 
-        window.onload = loadData;
+        // 渲染指定的策略
+        function renderStrategy(strategyId) {
+            currentStrategyId = strategyId;
+            const data = dashboardData.strategies[strategyId];
+            const metrics = data.metrics;
+            const ts = new Date().getTime(); // 防止图片缓存
+
+            // 更新侧边栏按钮状态
+            document.querySelectorAll('.strategy-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.dataset.id === strategyId) btn.classList.add('active');
+            });
+
+            // 1. 更新标题和元数据
+            document.getElementById('page-title').textContent = data.name;
+            document.getElementById('strategy-tag').textContent = data.tag;
+            document.getElementById('strategy-capital').textContent = data.capital.toLocaleString();
+
+            // 2. 更新指标卡片
+            formatNumberColor('val-roi', metrics.total_roi, true);
+            formatNumberColor('val-pnl', metrics.total_pnl > 0 ? "+" + metrics.total_pnl : metrics.total_pnl);
+            formatNumberColor('val-mdd', metrics.max_drawdown, true);
+            
+            document.getElementById('val-sharpe').textContent = metrics.sharpe_ratio;
+            document.getElementById('val-days').textContent = metrics.running_days;
+
+            // 3. 更新图片 (添加时间戳避免缓存)
+            document.getElementById('img-equity').src = `${data.images.equity}?t=${ts}`;
+            document.getElementById('img-pnl').src = `${data.images.pnl_hist}?t=${ts}`;
+        }
+
+        // 初始化加载
+        function init() {
+            // 读取生成的 JSON 数据
+            fetch('data/dashboard_data.json')
+                .then(response => response.json())
+                .then(data => {
+                    dashboardData = data;
+                    const navContainer = document.getElementById('strategy-list');
+                    navContainer.innerHTML = '';
+
+                    // 动态生成侧边栏按钮
+                    const strategyKeys = Object.keys(data.strategies);
+                    
+                    strategyKeys.forEach(key => {
+                        const s = data.strategies[key];
+                        const btn = document.createElement('button');
+                        btn.className = 'strategy-btn';
+                        btn.dataset.id = key;
+                        // 提取频率标签的简写
+                        const simpleTag = s.tag.split('(')[0].trim(); 
+                        btn.innerHTML = `<span>${key}</span> <span class="freq-badge">${simpleTag}</span>`;
+                        
+                        btn.onclick = () => renderStrategy(key);
+                        navContainer.appendChild(btn);
+                    });
+
+                    // 更新最后更新时间
+                    document.getElementById('last-update').textContent = `Last Updated: ${data.last_updated}`;
+
+                    // 默认显示第一个策略
+                    if (strategyKeys.length > 0) {
+                        renderStrategy(strategyKeys[0]);
+                    }
+                })
+                .catch(err => {
+                    console.error("加载数据失败:", err);
+                    document.getElementById('page-title').textContent = "数据加载失败，请检查 JSON 路径";
+                });
+        }
+
+        window.onload = init;
     </script>
 </body>
 </html>
