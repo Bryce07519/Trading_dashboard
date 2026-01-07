@@ -1,5 +1,5 @@
 {
-  "last_updated": "2026-01-01 16:53:31 UTC",
+  "last_updated": "2026-01-07 03:34:41 UTC",
   "strategies": {
     "LTC": {
       "id": "LTC",
@@ -7,12 +7,12 @@
       "tag": "低频次 (Low Freq)",
       "capital": 2000,
       "metrics": {
-        "total_roi": 4.33,
-        "total_pnl": 86.56,
+        "total_roi": 4.45,
+        "total_pnl": 88.94,
         "max_drawdown": -1.14,
-        "sharpe_ratio": 5.82,
+        "sharpe_ratio": 5.99,
         "win_rate": 70.0,
-        "running_days": 54
+        "running_days": 59
       },
       "images": {
         "equity": "data/LTC/equity_curve.png",
@@ -25,12 +25,12 @@
       "tag": "中频次 (Mid Freq)",
       "capital": 1000,
       "metrics": {
-        "total_roi": 0.75,
-        "total_pnl": 7.53,
+        "total_roi": 4.94,
+        "total_pnl": 49.36,
         "max_drawdown": -3.63,
-        "sharpe_ratio": 1.09,
-        "win_rate": 58.33,
-        "running_days": 31
+        "sharpe_ratio": 4.58,
+        "win_rate": 56.25,
+        "running_days": 36
       },
       "images": {
         "equity": "data/FET/equity_curve.png",
@@ -43,12 +43,12 @@
       "tag": "高频次 (High Freq)",
       "capital": 2000,
       "metrics": {
-        "total_roi": -13.22,
-        "total_pnl": -264.48,
+        "total_roi": -10.48,
+        "total_pnl": -209.62,
         "max_drawdown": -18.27,
-        "sharpe_ratio": -2.26,
-        "win_rate": 48.21,
-        "running_days": 78
+        "sharpe_ratio": -1.68,
+        "win_rate": 48.33,
+        "running_days": 83
       },
       "images": {
         "equity": "data/1000BONK/equity_curve.png",
