@@ -27,8 +27,8 @@ import matplotlib.dates as mdates
 
 # ── 配置 ──
 API_CONFIG = '/root/Binance/config/bn_sub2_api_config.json'
-START_DATE = datetime.datetime(2026, 4, 24, 0, 0, tzinfo=datetime.timezone.utc)
-INITIAL_CAPITAL = 1000.0  # 4/24 启动时本金近似 (BN 按比例下单, 复利反映在 equity 曲线)
+START_DATE = datetime.datetime(2026, 4, 10, 0, 0, tzinfo=datetime.timezone.utc)
+INITIAL_CAPITAL = 1000.0  # 4/10 策略上线时本金近似 (BN 按比例下单, 复利反映在 equity 曲线)
 
 SYMBOLS = [
     'DOGE/USDC:USDC', 'FET/USDT:USDT', 'PENDLE/USDT:USDT', '1000BONK/USDC:USDC',
@@ -66,7 +66,9 @@ def fetch_all_trades(ex):
                 print(f"  {sym} fetch error: {e}", file=sys.stderr)
                 break
             if not trades:
-                break
+                # 当前 since 没数据, 跳过 7 天继续 (BN 可能某段空窗期)
+                since += 7 * 24 * 3600 * 1000
+                continue
             new = [t for t in trades if t['id'] not in seen]
             if not new:
                 since += 7 * 24 * 3600 * 1000
@@ -152,11 +154,19 @@ def compute_metrics(roundtrips, fees):
     gross_loss = abs(sum(r['pnl'] for r in losses)) if losses else 0
     pf = gross_win / gross_loss if gross_loss > 0 else float('inf')
 
-    # 每日 PnL
-    daily_pnl = defaultdict(float)
+    # 每日 PnL (含没交易的日期, 填 0)
+    daily_pnl_raw = defaultdict(float)
     for rt in roundtrips:
         date = datetime.datetime.fromtimestamp(rt['close_time']/1000, tz=datetime.timezone.utc).strftime('%Y-%m-%d')
-        daily_pnl[date] += rt['pnl']
+        daily_pnl_raw[date] += rt['pnl']
+    # 填补完整日期序列
+    daily_pnl = {}
+    cur_d = START_DATE.date()
+    end_d = datetime.datetime.now(datetime.timezone.utc).date()
+    while cur_d <= end_d:
+        key = cur_d.strftime('%Y-%m-%d')
+        daily_pnl[key] = daily_pnl_raw.get(key, 0.0)
+        cur_d += datetime.timedelta(days=1)
 
     # Sharpe (用每日 PnL)
     daily_values = list(daily_pnl.values())
@@ -220,59 +230,167 @@ def compute_metrics(roundtrips, fees):
     }
 
 
+# ── 专业风格画图 ──
+
+PLOT_STYLE = {
+    'bg': '#ffffff',
+    'fg': '#1e293b',
+    'sub': '#64748b',
+    'grid': '#e2e8f0',
+    'primary': '#2563eb',
+    'primary_light': '#dbeafe',
+    'success': '#16a34a',
+    'danger': '#dc2626',
+    'accent': '#f59e0b',
+}
+
+def _setup_ax(ax, title=None):
+    ax.set_facecolor(PLOT_STYLE['bg'])
+    for spine in ['top', 'right']:
+        ax.spines[spine].set_visible(False)
+    for spine in ['left', 'bottom']:
+        ax.spines[spine].set_color(PLOT_STYLE['grid'])
+        ax.spines[spine].set_linewidth(0.8)
+    ax.tick_params(colors=PLOT_STYLE['sub'], labelsize=10)
+    ax.grid(axis='y', color=PLOT_STYLE['grid'], linewidth=0.6, alpha=0.8)
+    ax.set_axisbelow(True)
+    if title:
+        ax.set_title(title, fontsize=13, color=PLOT_STYLE['fg'], pad=14, fontweight='600', loc='left')
+
+
 def plot_equity(equity_points, output):
     if not equity_points:
         return
     times = [datetime.datetime.fromtimestamp(t/1000, tz=datetime.timezone.utc) for t, _ in equity_points]
-    pnls = [INITIAL_CAPITAL + p for _, p in equity_points]
-    fig, ax = plt.subplots(figsize=(12, 5))
-    ax.plot(times, pnls, color='#2563eb', linewidth=1.8)
-    ax.fill_between(times, INITIAL_CAPITAL, pnls, alpha=0.15, color='#2563eb')
-    ax.axhline(INITIAL_CAPITAL, color='gray', linestyle='--', alpha=0.5, label='Initial Capital')
-    ax.set_xlabel('Date')
-    ax.set_ylabel('Equity ($)')
-    ax.set_title('Portfolio Equity Curve')
-    ax.xaxis.set_major_formatter(mdates.DateFormatter('%m-%d'))
-    ax.grid(alpha=0.3)
-    ax.legend()
+    pnls = [p for _, p in equity_points]
+    equities = [INITIAL_CAPITAL + p for p in pnls]
+
+    # Drawdown 计算 (for shading)
+    peak = pnls[0]
+    in_dd = False
+    dd_start = None
+    dd_regions = []
+    for i, p in enumerate(pnls):
+        if p > peak:
+            peak = p
+            if in_dd and dd_start is not None:
+                dd_regions.append((dd_start, i))
+                in_dd = False
+                dd_start = None
+        elif p < peak:
+            if not in_dd:
+                dd_start = i
+                in_dd = True
+    if in_dd and dd_start is not None:
+        dd_regions.append((dd_start, len(pnls)-1))
+
+    fig, ax = plt.subplots(figsize=(13, 5.5), dpi=110)
+    fig.patch.set_facecolor(PLOT_STYLE['bg'])
+    _setup_ax(ax, title='Portfolio Equity Curve')
+
+    # 主曲线
+    ax.fill_between(times, INITIAL_CAPITAL, equities,
+                    where=[e >= INITIAL_CAPITAL for e in equities],
+                    color=PLOT_STYLE['success'], alpha=0.10, interpolate=True)
+    ax.fill_between(times, INITIAL_CAPITAL, equities,
+                    where=[e < INITIAL_CAPITAL for e in equities],
+                    color=PLOT_STYLE['danger'], alpha=0.10, interpolate=True)
+    ax.plot(times, equities, color=PLOT_STYLE['primary'], linewidth=2.0, zorder=5)
+
+    # Initial capital line
+    ax.axhline(INITIAL_CAPITAL, color=PLOT_STYLE['sub'], linestyle='--', linewidth=0.8, alpha=0.6)
+    ax.text(times[0], INITIAL_CAPITAL, f' Initial ${INITIAL_CAPITAL:.0f}',
+            color=PLOT_STYLE['sub'], fontsize=9, va='bottom', ha='left')
+
+    # 当前点标注
+    last_eq = equities[-1]
+    last_t = times[-1]
+    color_now = PLOT_STYLE['success'] if last_eq >= INITIAL_CAPITAL else PLOT_STYLE['danger']
+    ret_pct = (last_eq - INITIAL_CAPITAL) / INITIAL_CAPITAL * 100
+    ax.scatter([last_t], [last_eq], color=color_now, s=60, zorder=10, edgecolors='white', linewidths=1.5)
+    ax.annotate(f'${last_eq:.2f}\n{ret_pct:+.2f}%',
+                xy=(last_t, last_eq), xytext=(-15, 18), textcoords='offset points',
+                fontsize=11, fontweight='600', color=color_now, ha='right',
+                bbox=dict(boxstyle='round,pad=0.4', fc='white', ec=color_now, lw=1))
+
+    ax.set_xlabel('')
+    ax.set_ylabel('Equity ($)', fontsize=10, color=PLOT_STYLE['sub'])
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%b %d'))
+    ax.xaxis.set_major_locator(mdates.AutoDateLocator(maxticks=10))
+    fig.autofmt_xdate(rotation=0, ha='center')
     plt.tight_layout()
-    plt.savefig(output, dpi=100)
+    plt.savefig(output, dpi=130, facecolor=PLOT_STYLE['bg'])
     plt.close()
 
 
 def plot_daily(daily_pnl, output):
     if not daily_pnl:
         return
-    dates = sorted(daily_pnl.keys())
-    values = [daily_pnl[d] for d in dates]
-    colors = ['#16a34a' if v > 0 else '#dc2626' for v in values]
-    fig, ax = plt.subplots(figsize=(12, 4))
-    ax.bar(range(len(dates)), values, color=colors, alpha=0.85)
-    ax.axhline(0, color='black', linewidth=0.5)
-    ax.set_xticks(range(0, len(dates), max(1, len(dates)//15)))
-    ax.set_xticklabels([dates[i] for i in range(0, len(dates), max(1, len(dates)//15))], rotation=45)
-    ax.set_ylabel('Daily PnL ($)')
-    ax.set_title('Daily PnL')
-    ax.grid(alpha=0.3, axis='y')
+    dates_str = sorted(daily_pnl.keys())
+    dates = [datetime.datetime.strptime(d, '%Y-%m-%d') for d in dates_str]
+    values = [daily_pnl[d] for d in dates_str]
+    colors = [PLOT_STYLE['success'] if v > 0 else (PLOT_STYLE['danger'] if v < 0 else PLOT_STYLE['sub']) for v in values]
+
+    fig, ax = plt.subplots(figsize=(13, 4.5), dpi=110)
+    fig.patch.set_facecolor(PLOT_STYLE['bg'])
+    _setup_ax(ax, title='Daily PnL')
+
+    bars = ax.bar(dates, values, color=colors, alpha=0.85, width=0.7, edgecolor='none')
+    ax.axhline(0, color=PLOT_STYLE['fg'], linewidth=0.5)
+
+    # 标注最大盈/亏日
+    if values:
+        max_v = max(values)
+        min_v = min(values)
+        max_i = values.index(max_v)
+        min_i = values.index(min_v)
+        if max_v > 0:
+            ax.annotate(f'${max_v:+.1f}', xy=(dates[max_i], max_v),
+                        xytext=(0, 6), textcoords='offset points',
+                        fontsize=9, color=PLOT_STYLE['success'], ha='center', fontweight='600')
+        if min_v < 0:
+            ax.annotate(f'${min_v:+.1f}', xy=(dates[min_i], min_v),
+                        xytext=(0, -14), textcoords='offset points',
+                        fontsize=9, color=PLOT_STYLE['danger'], ha='center', fontweight='600')
+
+    ax.set_xlabel('')
+    ax.set_ylabel('PnL ($)', fontsize=10, color=PLOT_STYLE['sub'])
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%b %d'))
+    ax.xaxis.set_major_locator(mdates.AutoDateLocator(maxticks=15))
+    fig.autofmt_xdate(rotation=0, ha='center')
     plt.tight_layout()
-    plt.savefig(output, dpi=100)
+    plt.savefig(output, dpi=130, facecolor=PLOT_STYLE['bg'])
     plt.close()
 
 
 def plot_symbol_contrib(per_symbol, output):
     if not per_symbol:
         return
-    syms = sorted(per_symbol.keys(), key=lambda s: -per_symbol[s]['pnl'])
+    syms = sorted(per_symbol.keys(), key=lambda s: per_symbol[s]['pnl'])
     pnls = [per_symbol[s]['pnl'] for s in syms]
-    colors = ['#16a34a' if p > 0 else '#dc2626' for p in pnls]
-    fig, ax = plt.subplots(figsize=(10, 5))
-    ax.barh(syms, pnls, color=colors, alpha=0.85)
-    ax.axvline(0, color='black', linewidth=0.5)
-    ax.set_xlabel('PnL ($)')
-    ax.set_title('PnL Contribution by Symbol')
-    ax.grid(alpha=0.3, axis='x')
+    colors = [PLOT_STYLE['success'] if p > 0 else PLOT_STYLE['danger'] for p in pnls]
+
+    fig, ax = plt.subplots(figsize=(11, max(4.5, len(syms)*0.45)), dpi=110)
+    fig.patch.set_facecolor(PLOT_STYLE['bg'])
+    _setup_ax(ax, title='PnL Contribution by Symbol')
+    ax.grid(axis='x', color=PLOT_STYLE['grid'], linewidth=0.6, alpha=0.8)
+    ax.grid(axis='y', visible=False)
+
+    bars = ax.barh(syms, pnls, color=colors, alpha=0.85, edgecolor='none', height=0.7)
+    ax.axvline(0, color=PLOT_STYLE['fg'], linewidth=0.5)
+
+    for sym, val in zip(syms, pnls):
+        offset = 0.5 if val >= 0 else -0.5
+        ax.annotate(f'${val:+.2f}', xy=(val, sym), xytext=(offset*8, 0),
+                    textcoords='offset points',
+                    fontsize=10, fontweight='600',
+                    color=PLOT_STYLE['success'] if val > 0 else PLOT_STYLE['danger'],
+                    ha='left' if val >= 0 else 'right', va='center')
+
+    ax.set_xlabel('PnL ($)', fontsize=10, color=PLOT_STYLE['sub'])
+    ax.set_ylabel('')
     plt.tight_layout()
-    plt.savefig(output, dpi=100)
+    plt.savefig(output, dpi=130, facecolor=PLOT_STYLE['bg'])
     plt.close()
 
 
