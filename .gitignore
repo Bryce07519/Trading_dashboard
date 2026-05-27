@@ -1,4 +1,4 @@
-# Python/临时
+# Python
 __pycache__/
 *.pyc
 *.pyo
@@ -6,16 +6,24 @@ __pycache__/
 *.egg-info/
 .env
 
-# VSCode/IDE
+# IDE
 .vscode/
 .idea/
 
-# data: 只保留网页展示需要的文件；其它都忽略
+# data: 忽略 data 下的所有, 只放行 portfolio 视图需要的
 data/*
+!data/portfolio_data.json
 !data/stats.json
 !data/equity_curve.png
-!data/pnl_hist.png
+!data/daily_pnl.png
+!data/symbol_contribution.png
 
-# 可选：notebooks/缓存/大文件
+# 兼容旧版 (保留, 但新视图不依赖)
+!data/dashboard_data.json
+!data/*/
+data/*/*
+!data/*/*.png
+
+# 其他
 *.ipynb_checkpoints
 .DS_Store
