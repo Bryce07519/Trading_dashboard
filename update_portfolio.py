@@ -436,7 +436,7 @@ def write_portfolio_data(m, output):
         'last_updated': datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC'),
         'start_date': START_DATE.strftime('%Y-%m-%d'),
         'initial_capital': INITIAL_CAPITAL,
-        'strategy_description': 'Multi-symbol momentum strategy (12 coins, rolling 15min return, long/inverse)',
+        'strategy_description': 'Multi-coin systematic strategy (12 coins)',
         'metrics': {
             'total_pnl': round(m['total_pnl'], 2),
             'total_return_pct': round(m['total_return_pct'], 2),
